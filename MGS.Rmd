@@ -1,0 +1,274 @@
+---
+title: "MGS for Sharon"
+author: "Adam Duerr"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 80    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Libraries
+
+```{r}
+getwd()
+
+library(RMark)
+library(tictoc)
+library(dplyr)
+library(rmarkdown)
+
+cat("
+Ran at: ");Sys.time()
+```
+
+Download data
+
+```{r}
+tic()
+mgs.cjsdata <- read.table(file = "mgs.cgs.site1.txt", header = TRUE, colClasses = c("character","factor","factor"), col.names = c("ch", "captage", "sex"))
+
+#sort the data so we know how it is arraged
+arrange(mgs.cjsdata, mgs.cjsdata$sex, mgs.cjsdata$captage)
+
+# this appears to just let you view a portion of it
+summary(mgs.cjsdata)
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+subset the data so we can do a CJS analysis instead of Multistrata
+
+```{r}
+tic()
+
+#replace a, b and c with 1s
+mgs.cjsdata$ch <- gsub("2","1", mgs.cjsdata$ch)
+mgs.cjsdata$ch <- gsub("3","1", mgs.cjsdata$ch)
+mgs.cjsdata$ch <- gsub("4","1", mgs.cjsdata$ch)
+mgs.cjsdata$ch <- gsub("5","1", mgs.cjsdata$ch)
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+Process the data this step sets up the data for the appropriate model
+type in MARK Laake uses the term dp in this step. I am using pd for
+process(ed) data
+
+```{r}
+tic()
+#code for multistrata analysis
+#mgs.pd <- process.data(mgs.data1, model = "Multistrata", groups = c("captage", "sex"))
+
+mgs.pd <- process.data(mgs.cjsdata, model = "CJS", groups = c("sex", "captage"))
+
+str(mgs.pd)
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+Create the files needed for analysis in MARK This is where design
+matrices are created Laake uses the term ddl for design data list in
+this step
+
+For CJS data - for 500 rows of data - observations all converted to 1s
+This took a 98 seconds to run
+
+For MS data - Additional steps will be needed to set up the appropriate
+dm for age and movement parameters With this dataset, this takes a long
+time to run (I stopped it after an hour)
+
+```{r}
+tic()
+mgs.ddl <- make.design.data(mgs.pd)
+
+summary(mgs.ddl)
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+Run the default model in MARK this will be model 1 output m1o
+
+```{r}
+tic()
+
+m1o <- mark(mgs.pd, mgs.ddl)
+
+str(m1o)
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+Real estimates from model 1
+```{r}
+m1o$results$real
+
+cat("
+Ran at: ");Sys.time()
+```
+
+Setup design matrices start by reading days since start
+
+```{r}
+tic()
+ti1 <- (read.csv("M:/CSG Google Drive/Sharon MGS/cjs.time.interVals.csv", header = FALSE))
+ti.yr1 <- ti1/365
+ti <- as.numeric(ti1[1:328,])
+ti.yr <- as.numeric(ti.yr1[1:328,])
+summary(ti.yr)
+
+#cleanup
+rm(ti1)
+rm(ti.yr1)
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+add correct time interval - in years - to the process data
+
+```{r}
+tic()
+mgs.pd$time.intervals <- ti.yr
+
+#rerun model 1 - output = FALSE just doesn't print the output
+m1o <- mark(mgs.pd, mgs.ddl, output = FALSE)
+
+m1o$results$real
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+Set initial ages
+and try to set up design matrices for age-specific survival 
+Mark uses convention of capital letters to designate continuous variables and lower case for factors (e.g., Age and age)
+```{r}
+tic()
+
+#top of page 46 RMark Workshop Notes
+# set number of age variables to 2, set initial ages (by captage group Alphabetically)
+mgs.pd <- process.data(mgs.cjsdata, model = "CJS", groups = c("captage", "sex"), age.var = 2, initial.ages = c(1,0), time.intervals = ti.yr)
+
+str(mgs.pd)
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+
+
+
+THIS DIDN'T WORK 
+
+```{r}
+tic()
+#defining age bins so the bins are 0 to 1, 1 to 50 and 50 to? Really the last bin doesn't exist and 50 is > max age
+# right = TRUE meand the bins are closed on the right
+mgs.ddl <- make.design.data(mgs.pd, parameters = list(Phi=list(age.bins=c(0,1,50))), right = TRUE)
+levels(mgs.ddl$Phi$age) = c("1plus","0")
+summary(mgs.ddl$Phi$age)
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+
+```{r}
+tic()
+#define some formulas for models
+Phi.age <- list(formula=~age)
+p. <- list(formula=~1)
+
+m1o <- mark(mgs.pd, mgs.ddl, model.parameters = list(Phi=Phi.age, p = p.), output = FALSE)
+
+m1o$results$real
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+Export data to process directly in MARK
+
+
+```{r}
+tic()
+
+m2=mark(mgs.pd, mgs.ddl, model.parameters = list(Phi=p., p = p.), output = FALSE)
+
+export.MARK(mgs.pd, "mgs.cjsdata", m2, replace = TRUE )
+
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+
+
+
+Now try to run a set of different models and look at the results
+Page 70 of Rmark workshop notes
+THIS CAUSED ME PROBLEMS - ENDED UP RUNNING FOR AN HOUR AND HALF AND USING 95% OF MY 96GB memory
+
+```{r}
+tic()
+
+mgs.analysis = function(){
+  #formulas for Phi
+Phi.    = list(formula=~1     )
+Phi.sex = list(formula=~sex   )
+Phi.age = list(formula=~age   )
+  #formulas for p
+p.    = list(formula=~1     )
+p.sex = list(formula=~sex   )
+p.age = list(formula=~age     )
+  #create model list (ml) of all combinations of models
+mgs.ms=create.model.list("CJS")
+  # trying to speed things up using parallel processing
+#results = mark.wrapper.parallel(mgs.ms, data = mgs.pd, ddl = mgs.ddl, output = FALSE, silent = TRUE, parallel = TRUE, cpus = 16, threads = 1)
+results = mark.wrapper(mgs.ms, data = mgs.pd, ddl = mgs.ddl, output = FALSE, silent = TRUE )
+return(results)
+}
+
+mgs.mso = mgs.analysis()
+
+mgs.mso
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+
+
+
+Copy and paste r chunk to include timing information
+
+
+```{r}
+tic()
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
