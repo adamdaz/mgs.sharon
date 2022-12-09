@@ -32,7 +32,7 @@ Download data
 tic()
 mgs.cjsdata <- read.table(file = "mgs.cgs.site1.txt", header = TRUE, colClasses = c("character","factor","factor"), col.names = c("ch", "captage", "sex"))
 
-#sort the data so we know how it is arraged
+#sort the data so we know how it is arranged
 arrange(mgs.cjsdata, mgs.cjsdata$sex, mgs.cjsdata$captage)
 
 # this appears to just let you view a portion of it
@@ -125,7 +125,7 @@ Setup design matrices start by reading days since start
 
 ```{r}
 tic()
-ti1 <- (read.csv("M:/CSG Google Drive/Sharon MGS/cjs.time.interVals.csv", header = FALSE))
+ti1 <- (read.csv("M:/Cloud_storage/csg-google-drive/Sharon_MGS/cjs.time.interVals.csv", header = FALSE))
 ti.yr1 <- ti1/365
 ti <- as.numeric(ti1[1:328,])
 ti.yr <- as.numeric(ti.yr1[1:328,])
@@ -163,10 +163,17 @@ Mark uses convention of capital letters to designate continuous variables and lo
 tic()
 
 #top of page 46 RMark Workshop Notes
-# set number of age variables to 2, set initial ages (by captage group Alphabetically)
-mgs.pd <- process.data(mgs.cjsdata, model = "CJS", groups = c("captage", "sex"), age.var = 2, initial.ages = c(1,0), time.intervals = ti.yr)
 
-str(mgs.pd)
+# set number of age variables to 2, set initial ages (by captage group Alphabetically)
+
+mgs2.pd <- process.data(mgs.cjsdata, model = "CJS", groups = c("captage", "sex"), age.var = 2, initial.ages = c(1,0), time.intervals = ti.yr)
+
+mgs2.ddl <- make.design.data(mgs2.pd)
+
+#change age to a factor of 1 or 0 for adult or juv
+
+mgs2.ddl$Phi$age = factor(ifelse(mgs2.ddl$Phi$Age<1,0,1 ))
+mgs2.ddl$p$age = factor(ifelse(mgs2.ddl$p$Age<1,0,1))
 
 cat("
 Ran at: ");Sys.time()
@@ -176,20 +183,30 @@ toc()
 
 
 
-THIS DIDN'T WORK 
+Rerun model with age-specific survival+
 
 ```{r}
 tic()
-#defining age bins so the bins are 0 to 1, 1 to 50 and 50 to? Really the last bin doesn't exist and 50 is > max age
-# right = TRUE meand the bins are closed on the right
-mgs.ddl <- make.design.data(mgs.pd, parameters = list(Phi=list(age.bins=c(0,1,50))), right = TRUE)
-levels(mgs.ddl$Phi$age) = c("1plus","0")
-summary(mgs.ddl$Phi$age)
+
+Phi.age=list(formula=~age)
+p.age = list(formula=~age)
+
+m2o <- mark(mgs2.pd, mgs2.ddl, model.parameters = list(Phi=Phi.age, p = p.age), output = FALSE)
+
+
+
+m2o$results$real
+
+
 
 cat("
 Ran at: ");Sys.time()
 toc()
 ```
+
+
+
+
 
 
 ```{r}
@@ -198,36 +215,26 @@ tic()
 Phi.age <- list(formula=~age)
 p. <- list(formula=~1)
 
-m1o <- mark(mgs.pd, mgs.ddl, model.parameters = list(Phi=Phi.age, p = p.), output = FALSE)
+m3o <- mark(mgs2.pd, mgs2.ddl, model.parameters = list(Phi=Phi.age, p = p.), output = FALSE)
 
-m1o$results$real
-
-cat("
-Ran at: ");Sys.time()
-toc()
-```
-Export data to process directly in MARK
-
-
-```{r}
-tic()
-
-m2=mark(mgs.pd, mgs.ddl, model.parameters = list(Phi=p., p = p.), output = FALSE)
-
-export.MARK(mgs.pd, "mgs.cjsdata", m2, replace = TRUE )
-
+m3o$results$real
 
 cat("
 Ran at: ");Sys.time()
 toc()
 ```
+
+
+
+
 
 
 
 
 Now try to run a set of different models and look at the results
 Page 70 of Rmark workshop notes
-THIS CAUSED ME PROBLEMS - ENDED UP RUNNING FOR AN HOUR AND HALF AND USING 95% OF MY 96GB memory
+
+This list of 9 models took 45 minutes to run
 
 ```{r}
 tic()
@@ -245,7 +252,7 @@ p.age = list(formula=~age     )
 mgs.ms=create.model.list("CJS")
   # trying to speed things up using parallel processing
 #results = mark.wrapper.parallel(mgs.ms, data = mgs.pd, ddl = mgs.ddl, output = FALSE, silent = TRUE, parallel = TRUE, cpus = 16, threads = 1)
-results = mark.wrapper(mgs.ms, data = mgs.pd, ddl = mgs.ddl, output = FALSE, silent = TRUE )
+results = mark.wrapper(mgs.ms, data = mgs2.pd, ddl = mgs2.ddl, output = FALSE, silent = TRUE )
 return(results)
 }
 
@@ -258,6 +265,25 @@ Ran at: ");Sys.time()
 toc()
 ```
 
+
+
+
+
+Export data to process directly in MARK
+
+
+```{r}
+tic()
+
+m2=mark(mgs.pd, mgs.ddl, model.parameters = list(Phi=p., p = p.), output = FALSE)
+
+export.MARK(mgs.pd, "mgs.cjsdata", m2, replace = TRUE )
+
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
 
 
 
