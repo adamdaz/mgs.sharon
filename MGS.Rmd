@@ -234,7 +234,9 @@ toc()
 Now try to run a set of different models and look at the results
 Page 70 of Rmark workshop notes
 
-This list of 9 models took 45 minutes to run
+This list of 9 models took 3 minutes to run
+
+mgs.mso is mgs model set output
 
 ```{r}
 tic()
@@ -266,6 +268,54 @@ toc()
 ```
 
 
+Run analysis as robust design for site 2
+
+Read data files 
+```{r}
+tic()
+mgs.rd.data.site2a <- read.table(file = "mgs.rd.site2.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor"), col.names = c("ch", "captage", "sex", "id") )
+
+mgs.rd.data.site2 <- subset(mgs.rd.data.site2a, mgs.rd.data.site2a$id != "Dummy" )
+
+#replace strata with 1s
+mgs.rd.data.site2$ch <- gsub("2","1", mgs.rd.data.site2$ch)
+mgs.rd.data.site2$ch <- gsub("3","1", mgs.rd.data.site2$ch)
+mgs.rd.data.site2$ch <- gsub("4","1", mgs.rd.data.site2$ch)
+
+ti.site2 <- (read.csv("mgs.rd.time.intervals.site2.csv", header = FALSE))
+ti.site2a <- as.numeric(ti.site2[1:23,])
+
+mgs.time.intervals.rd.yr <- ti.site2a/365
+
+write.csv(mgs.time.intervals.rd.yr,"rd.yr.csv")
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+
+Set up analysis
+```{r}
+tic()
+mgs.rd.pd <- process.data(data = mgs.rd.test, model = "Robust", groups = c("captage", "sex", "id"), time.intervals = mgs.time.intervals.rd.yr)
+
+mgs.rd.ddl <- make.design.data(mgs.rd.pd)
+
+cat("
+Ran at: ");Sys.time()
+toc()
+
+```
+Run a model 
+
+```{r}
+
+mrd1o <- mark(mgs.rd.pd, mgs.rd.ddl, output = FALSE)
+
+mrd1o$results$real
+
+```
 
 
 
