@@ -164,9 +164,9 @@ tic()
 
 #top of page 46 RMark Workshop Notes
 
-# set number of age variables to 2, set initial ages (by captage group Alphabetically)
+# set number of age variable to 1 (first group variable in list of groups), set initial ages (by captage group Alphabetically)
 
-mgs2.pd <- process.data(mgs.cjsdata, model = "CJS", groups = c("captage", "sex"), age.var = 2, initial.ages = c(1,0), time.intervals = ti.yr)
+mgs2.pd <- process.data(mgs.cjsdata, model = "CJS", groups = c("captage", "sex"), age.var = 1, initial.ages = c(1,0), time.intervals = ti.yr)
 
 mgs2.ddl <- make.design.data(mgs2.pd)
 
@@ -282,12 +282,17 @@ mgs.rd.data.site2$ch <- gsub("2","1", mgs.rd.data.site2$ch)
 mgs.rd.data.site2$ch <- gsub("3","1", mgs.rd.data.site2$ch)
 mgs.rd.data.site2$ch <- gsub("4","1", mgs.rd.data.site2$ch)
 
-ti.site2 <- (read.csv("mgs.rd.time.intervals.site2.csv", header = FALSE))
-ti.site2a <- as.numeric(ti.site2[1:23,])
+ti.site2a <- (read.csv("mgs.rd.time.intervals.site2.csv", header = FALSE))
+ti.site2 <- as.numeric(ti.site2a[1:709,])
 
-mgs.time.intervals.rd.yr <- ti.site2a/365
+mgs.time.intervals.rd.yr <- ti.site2/365
 
 write.csv(mgs.time.intervals.rd.yr,"rd.yr.csv")
+
+#cleanup
+rm(mgs.rd.data.site2a)
+rm(ti.site2a)
+
 
 cat("
 Ran at: ");Sys.time()
@@ -296,26 +301,109 @@ toc()
 
 
 Set up analysis
+
+Be careful with the groups that you define in pd.  Too many groups will cause make.design.data take a long time to process.
+
 ```{r}
 tic()
-mgs.rd.pd <- process.data(data = mgs.rd.test, model = "Robust", groups = c("captage", "sex", "id"), time.intervals = mgs.time.intervals.rd.yr)
+mgs.rd.pd <- process.data(data = mgs.rd.data.site2, model = "Robust", groups = c("captage", "sex"), time.intervals = mgs.time.intervals.rd.yr, age.var = 1, initial.ages = c(1,0), age.unit = 1)
 
 mgs.rd.ddl <- make.design.data(mgs.rd.pd)
+
+
+mgs.rd.ddl$S$age = factor(ifelse(mgs.rd.ddl$S$Age<1,0,1 ))
+
 
 cat("
 Ran at: ");Sys.time()
 toc()
 
 ```
-Run a model 
+Sample code to model RD analysis 
 
 ```{r}
-
-mrd1o <- mark(mgs.rd.pd, mgs.rd.ddl, output = FALSE)
-
-mrd1o$results$real
+mgs.analysis = function(){
+  #formulas for Phi
+Phi.    = list(formula=~1     )
+Phi.sex = list(formula=~sex   )
+Phi.age = list(formula=~age   )
+  #formulas for p
+p.    = list(formula=~1     )
+p.sex = list(formula=~sex   )
+p.age = list(formula=~age     )
+  #create model list (ml) of all combinations of models
+mgs.ms=create.model.list("CJS")
+  # trying to speed things up using parallel processing
+#results = mark.wrapper.parallel(mgs.ms, data = mgs.pd, ddl = mgs.ddl, output = FALSE, silent = TRUE, parallel = TRUE, cpus = 16, threads = 1)
+results = mark.wrapper(mgs.ms, data = mgs2.pd, ddl = mgs2.ddl, output = FALSE, silent = TRUE )
+return(results)
+}
 
 ```
+
+
+
+
+
+Run a model set
+This set of models took 45 minutes to run when I didn't specify models for f0
+Took 3 minutes with only 3 survival models 
+took 3 1/2 minutes with 4 survival models
+f0 are the estimate of N 
+
+```{r}
+tic()
+
+mgs.analysis = function(){
+  #formulas for S
+S.dot    = list(formula=~1     )
+S.sex = list(formula=~sex   )
+S.age = list(formula=~age   )
+S.agesex = list(formula=~age + sex)
+  #formulas for p c gamma` gamma ``
+p.dot = list(formula=~1)
+c.dot = list(formula=~1)
+GammaDoublePrime.dot = list(formula=~1)
+GammaPrime.dot = list(formula=~1)
+f0.dot = list(formula=~1)
+  #create model list (ml) of all combinations of models
+mgs.ms=create.model.list("Robust")
+  # trying to speed things up using parallel processing
+#results = mark.wrapper.parallel(mgs.ms, data = mgs.rd.data.site2, ddl = mgs.rd.ddl, output = FALSE, silent = TRUE, parallel = TRUE, cpus = 16, threads = -1)
+results = mark.wrapper(mgs.ms, data = mgs.rd.pd, ddl = mgs.rd.ddl, output = FALSE, silent = TRUE )
+return(results)
+}
+
+mgs.mso = mgs.analysis()
+
+mgs.mso
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+Look at results for each model 
+```{r}
+mgs.mso$S.agesex.GammaDoublePrime.dot.GammaPrime.dot.p.dot.c.dot.f0.dot$results$real
+mgs.mso$S.age.GammaDoublePrime.dot.GammaPrime.dot.p.dot.c.dot$results$real
+mgs.mso$S.sex.GammaDoublePrime.dot.GammaPrime.dot.p.dot.c.dot$results$real
+mgs.mso$S.dot.GammaDoublePrime.dot.GammaPrime.dot.p.dot.c.dot$results$real
+
+```
+
+
+Clean up the folder - remove unneeded mark files. 
+
+```{r}
+cleanup(ask = FALSE)
+```
+
+
+
+
+
+
+HAVEN'T SUCCESSFULLY RUN CODE BELOW
 
 
 
