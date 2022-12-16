@@ -377,10 +377,10 @@ time intervals are identical for all sites
 
 ```{r}
 tic()
-mgs.rd.data.site1a <- read.table(file = "mgs.rd.site1.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage", "sex", "id", "site") )
-mgs.rd.data.site2a <- read.table(file = "mgs.rd.site2.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage", "sex", "id", "site") )
-mgs.rd.data.site3a <- read.table(file = "mgs.rd.site3.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage", "sex", "id", "site") )
-mgs.rd.data.site4a <- read.table(file = "mgs.rd.site4.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage", "sex", "id", "site") )
+mgs.rd.data.site1a <- read.table(file = "mgs.rd.site1.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site2a <- read.table(file = "mgs.rd.site2.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site3a <- read.table(file = "mgs.rd.site3.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site4a <- read.table(file = "mgs.rd.site4.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
 
 mgs.rd.alla <- rbind(mgs.rd.data.site1a, mgs.rd.data.site2a, mgs.rd.data.site3a, mgs.rd.data.site4a)
 
@@ -392,18 +392,17 @@ mgs.rd.allc$ch <- gsub("2","1", mgs.rd.allc$ch)
 mgs.rd.allc$ch <- gsub("3","1", mgs.rd.allc$ch)
 mgs.rd.allc$ch <- gsub("4","1", mgs.rd.allc$ch)
 
-mgs.rd.allc$captage1 <- as.factor(ifelse(mgs.rd.allc$captage=="ADU",1,0))
+mgs.rd.allc$captage <- as.factor(ifelse(mgs.rd.allc$captage1=="ADU",1,0))
 
 #only include certain columns of data
 mgs.rd.all <- mgs.rd.allc[c(1,3,5,6)]
 
-
-ti.site2a <- (read.csv("mgs.rd.time.intervals.site2.csv", header = FALSE))
-ti.site2 <- as.numeric(ti.site2a[1:709,])
-
+#possibly something wrong here 12-16-22
+ti.site2 <- as.numeric(read.csv("mgs.rd.time.intervals.site2.csv", header = FALSE))
 mgs.time.intervals.rd.yr <- ti.site2/365
 
 #cleanup
+rm(mgs.rd.alla, mgs.rd.allb, mgs.rd.allc, ti.site2, mgs.rd.data.site1a, mgs.rd.data.site2a, mgs.rd.data.site3a, mgs.rd.data.site4a)
 
 
 cat("
@@ -415,7 +414,7 @@ toc()
 
 ```{r}
 tic()
-mgs.rd.pd <- process.data(data = mgs.rd.all, model = "Robust", groups = c("sex", "site", "captage1"), time.intervals = mgs.time.intervals.rd.yr, age.var = 3, initial.ages = c(1,0), age.unit = 1)
+mgs.rd.pd <- process.data(data = mgs.rd.all, model = "Robust", groups = c("sex","captage", "site"), time.intervals = mgs.time.intervals.rd.yr, age.var = 2, initial.ages = c(1,0), age.unit = 1)
 
 mgs.rd.ddl <- make.design.data(mgs.rd.pd)
 
@@ -496,16 +495,63 @@ Include data to constrain p and c by site and date
 
 ```{r}
 tic()
+#input data for each site
+mgs.rd.data.site1a <- read.table(file = "mgs.rd.site1.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site2a <- read.table(file = "mgs.rd.site2.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site3a <- read.table(file = "mgs.rd.site3.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site4a <- read.table(file = "mgs.rd.site4.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+
+mgs.rd.alla <- rbind(mgs.rd.data.site1a, mgs.rd.data.site2a, mgs.rd.data.site3a, mgs.rd.data.site4a)
+
+mgs.rd.allb <- subset(mgs.rd.alla, mgs.rd.alla$id != "Dummy" )
+mgs.rd.allc <- subset(mgs.rd.allb, mgs.rd.allb$captage != "" )
+
+#replace strata with 1s
+mgs.rd.allc$ch <- gsub("2","1", mgs.rd.allc$ch)
+mgs.rd.allc$ch <- gsub("3","1", mgs.rd.allc$ch)
+mgs.rd.allc$ch <- gsub("4","1", mgs.rd.allc$ch)
+
+mgs.rd.allc$captage <- as.factor(ifelse(mgs.rd.allc$captage=="ADU",1,0))
+
+mgs.rd.all <- mgs.rd.allc
+
+#cleanup 
+
+rm(mgs.rd.alla, mgs.rd.allb, mgs.rd.allc, mgs.rd.data.site1a ,mgs.rd.data.site2a, mgs.rd.data.site3a, mgs.rd.data.site4a)
+
 # input the data for each site to include the constrained values for p and c by date since start
 # days since start are only for the primary occassions (sessions) 
-site1.fixed.pc <- read.csv("site1.fixed.pc.csv", header = TRUE, fill = TRUE)
-site2.fixed.pc <- read.csv("site2.fixed.pc.csv", header = TRUE, fill = TRUE)
-site3.fixed.pc <- read.csv("site3.fixed.pc.csv", header = TRUE, fill = TRUE)
-site4.fixed.pc <- read.csv("site4.fixed.pc.csv", header = TRUE, fill = TRUE)
+fixed.pc <- read.csv("fixed.pc.csv", header = TRUE, fill = TRUE)
+site1.fixed.p <- fixed.pc[,"site1.fixed.p"]
+site2.fixed.p <- fixed.pc[,"site2.fixed.p"]
+site3.fixed.p <- fixed.pc[,"site3.fixed.p"]
+site4.fixed.p <- fixed.pc[,"site4.fixed.p"]
 
-#input the day from start for each element in the ch
-days.from.start <-(read.csv("days.from.start.csv", header = TRUE))
+# set fixed p for 16 groups where site is last - 
+# 710 lines * 4 = 2840 for site 1, next 2840 site 2, etc.
+fixed.p <- c(rep(site1.fixed.p, 4), rep(site2.fixed.p,4), rep(site3.fixed.p, 4), rep(site4.fixed.p,4))
 
+#set fixed for c similarly except do not include the "s"
+a <- fixed.pc[,"site1.fixed.c"]
+site1.fixed.c <- as.numeric(subset(a, a!="s"))
+
+a <- fixed.pc[,"site2.fixed.c"]
+site2.fixed.c <- as.numeric(subset(a, a!="s"))
+
+a <- fixed.pc[,"site3.fixed.c"]
+site3.fixed.c <- as.numeric(subset(a, a!="s"))
+
+a <- fixed.pc[,"site4.fixed.c"]
+site4.fixed.c <- as.numeric(subset(a, a!="s"))
+
+fixed.c <- c(rep(site1.fixed.c,4), rep(site2.fixed.c,4), rep(site3.fixed.c,4), rep(site4.fixed.c,4))
+
+# set time intervals 
+a <- fixed.pc[,"Time.intervals..years."]
+rd.yr <- as.numeric(a[1:709])
+
+#cleanup 
+rm(a, site1.fixed.c, site1.fixed.p, site2.fixed.c, site2.fixed.p, site3.fixed.c, site3.fixed.p, site4.fixed.c, site4.fixed.p)
 
 
 cat("
@@ -517,12 +563,23 @@ toc()
 
 
 
-Copy and paste r chunk to include timing information
+process data and make ddl
+
 
 
 ```{r}
 tic()
 
+mgs.rd.pd <- process.data(data = mgs.rd.all, model = "Robust", groups = c("sex","captage", "site"), time.intervals = rd.yr, age.var = 2, initial.ages = c(1,0), age.unit = 1)
+
+mgs.rd.ddl <- make.design.data(mgs.rd.pd)
+
+
+mgs.rd.ddl$S$age = factor(ifelse(mgs.rd.ddl$S$Age<1,0,1 ))
+
+
+
+
 cat("
 Ran at: ");Sys.time()
 toc()
@@ -532,17 +589,42 @@ toc()
 
 
 
-Copy and paste r chunk to include timing information
+Run a simple model with constraints
+
+Test to see if I specified this correctly
+ran without the fixed = fixed statements to see if the code will run
+
+took 17 minutes to run
+
+```{r}
+tic()
+Sas = list(formula=~age + sex)
+g.dot = list(formula=~1)
+p.fix = list(formula=~1, fixed=fixed.p)
+c.fix = list(formula=~1, fixed=fixed.c)
+# p.fix = list(formula=~1)
+# c.fix = list(formula=~1)
+f0.site = list(formula=~site)
+mrd1 <- mark(mgs.rd.pd, mgs.rd.ddl, model.parameters = list(S = Sas, GammaDoublePrime = g.dot, GammaPrime = g.dot, p=p.fix, c=c.fix, f0=f0.site))
+
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
 
 
 ```{r}
 tic()
 
+mrd1$results$real
+
+
 cat("
 Ran at: ");Sys.time()
 toc()
 ```
-
 
 
 
