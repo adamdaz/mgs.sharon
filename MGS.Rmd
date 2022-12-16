@@ -319,28 +319,6 @@ Ran at: ");Sys.time()
 toc()
 
 ```
-Sample code to model RD analysis 
-
-```{r}
-mgs.analysis = function(){
-  #formulas for Phi
-Phi.    = list(formula=~1     )
-Phi.sex = list(formula=~sex   )
-Phi.age = list(formula=~age   )
-  #formulas for p
-p.    = list(formula=~1     )
-p.sex = list(formula=~sex   )
-p.age = list(formula=~age     )
-  #create model list (ml) of all combinations of models
-mgs.ms=create.model.list("CJS")
-  # trying to speed things up using parallel processing
-#results = mark.wrapper.parallel(mgs.ms, data = mgs.pd, ddl = mgs.ddl, output = FALSE, silent = TRUE, parallel = TRUE, cpus = 16, threads = 1)
-results = mark.wrapper(mgs.ms, data = mgs2.pd, ddl = mgs2.ddl, output = FALSE, silent = TRUE )
-return(results)
-}
-
-```
-
 
 
 
@@ -391,12 +369,195 @@ mgs.mso$S.dot.GammaDoublePrime.dot.GammaPrime.dot.p.dot.c.dot$results$real
 
 ```
 
+Run analysis for all 4 sites
+
+Download data for all sites 
+time intervals are identical for all sites
+
+
+```{r}
+tic()
+mgs.rd.data.site1a <- read.table(file = "mgs.rd.site1.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage", "sex", "id", "site") )
+mgs.rd.data.site2a <- read.table(file = "mgs.rd.site2.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage", "sex", "id", "site") )
+mgs.rd.data.site3a <- read.table(file = "mgs.rd.site3.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage", "sex", "id", "site") )
+mgs.rd.data.site4a <- read.table(file = "mgs.rd.site4.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage", "sex", "id", "site") )
+
+mgs.rd.alla <- rbind(mgs.rd.data.site1a, mgs.rd.data.site2a, mgs.rd.data.site3a, mgs.rd.data.site4a)
+
+mgs.rd.allb <- subset(mgs.rd.alla, mgs.rd.alla$id != "Dummy" )
+mgs.rd.allc <- subset(mgs.rd.allb, mgs.rd.allb$captage != "" )
+
+#replace strata with 1s
+mgs.rd.allc$ch <- gsub("2","1", mgs.rd.allc$ch)
+mgs.rd.allc$ch <- gsub("3","1", mgs.rd.allc$ch)
+mgs.rd.allc$ch <- gsub("4","1", mgs.rd.allc$ch)
+
+mgs.rd.allc$captage1 <- as.factor(ifelse(mgs.rd.allc$captage=="ADU",1,0))
+
+#only include certain columns of data
+mgs.rd.all <- mgs.rd.allc[c(1,3,5,6)]
+
+
+ti.site2a <- (read.csv("mgs.rd.time.intervals.site2.csv", header = FALSE))
+ti.site2 <- as.numeric(ti.site2a[1:709,])
+
+mgs.time.intervals.rd.yr <- ti.site2/365
+
+#cleanup
+
+
+cat("
+Ran at: ");Sys.time()
+toc()
+
+```
+
+
+```{r}
+tic()
+mgs.rd.pd <- process.data(data = mgs.rd.all, model = "Robust", groups = c("sex", "site", "captage1"), time.intervals = mgs.time.intervals.rd.yr, age.var = 3, initial.ages = c(1,0), age.unit = 1)
+
+mgs.rd.ddl <- make.design.data(mgs.rd.pd)
+
+
+mgs.rd.ddl$S$age = factor(ifelse(mgs.rd.ddl$S$Age<1,0,1 ))
+
+
+cat("
+Ran at: ");Sys.time()
+toc()
+
+```
+
+Run model set 
+This took 75 minutes
+```{r}
+tic()
+
+mgs.analysis = function(){
+  #formulas for S
+S.dot    = list(formula=~1     )
+S.sex = list(formula=~sex   )
+S.age = list(formula=~age   )
+S.site = list(formula=~site)
+S.agesex = list(formula=~age + sex)
+S.agesite = list(formula=~age + site)
+S.sexsite = list(formula=~sex + site)
+S.ass = list(formula=~age + sex + site)
+  #formulas for p c gamma` gamma ``
+p.dot = list(formula=~1)
+c.dot = list(formula=~1)
+GammaDoublePrime.dot = list(formula=~1)
+GammaPrime.dot = list(formula=~1)
+f0.dot = list(formula=~1)
+  #create model list (ml) of all combinations of models
+mgs.ms=create.model.list("Robust")
+  # trying to speed things up using parallel processing
+#results = mark.wrapper.parallel(mgs.ms, data = mgs.rd.data.site2, ddl = mgs.rd.ddl, output = FALSE, silent = TRUE, parallel = TRUE, cpus = 16, threads = -1)
+results = mark.wrapper(mgs.ms, data = mgs.rd.pd, ddl = mgs.rd.ddl, output = FALSE, silent = TRUE )
+return(results)
+}
+
+mgs.mso = mgs.analysis()
+
+mgs.mso
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+
+
+
+
+```{r}
+tic()
+
+write.csv(mgs.mso$S.sexsite.GammaDoublePrime.dot.GammaPrime.dot.p.dot.c.dot.f0.dot$results$real, file = "S.sex site.csv")
+write.csv(mgs.mso$S.ass.GammaDoublePrime.dot.GammaPrime.dot.p.dot.c.dot.f0.dot$results$real, file = "S.age sex site.csv")
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
 
 Clean up the folder - remove unneeded mark files. 
 
 ```{r}
 cleanup(ask = FALSE)
 ```
+
+
+
+Include data to constrain p and c by site and date
+
+
+```{r}
+tic()
+# input the data for each site to include the constrained values for p and c by date since start
+# days since start are only for the primary occassions (sessions) 
+site1.fixed.pc <- read.csv("site1.fixed.pc.csv", header = TRUE, fill = TRUE)
+site2.fixed.pc <- read.csv("site2.fixed.pc.csv", header = TRUE, fill = TRUE)
+site3.fixed.pc <- read.csv("site3.fixed.pc.csv", header = TRUE, fill = TRUE)
+site4.fixed.pc <- read.csv("site4.fixed.pc.csv", header = TRUE, fill = TRUE)
+
+#input the day from start for each element in the ch
+days.from.start <-(read.csv("days.from.start.csv", header = TRUE))
+
+
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+
+
+
+
+Copy and paste r chunk to include timing information
+
+
+```{r}
+tic()
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+
+
+
+
+Copy and paste r chunk to include timing information
+
+
+```{r}
+tic()
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
+
+
+
+
+Copy and paste r chunk to include timing information
+
+
+```{r}
+tic()
+
+cat("
+Ran at: ");Sys.time()
+toc()
+```
+
 
 
 
@@ -423,16 +584,4 @@ Ran at: ");Sys.time()
 toc()
 ```
 
-
-
-Copy and paste r chunk to include timing information
-
-
-```{r}
-tic()
-
-cat("
-Ran at: ");Sys.time()
-toc()
-```
 
