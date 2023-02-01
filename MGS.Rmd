@@ -16,7 +16,8 @@ Libraries
 
 ```{r}
 getwd()
-
+library(usethis)
+library(renv)
 library(RMark)
 library(tictoc)
 library(dplyr)
@@ -490,6 +491,9 @@ cleanup(ask = FALSE)
 
 
 
+
+
+
 Include data to constrain p and c by site and date
 
 
@@ -587,25 +591,27 @@ toc()
 
 
 
+Clean up the folder - remove unneeded mark files. 
+
+```{r}
+cleanup(ask = FALSE)
+```
 
 
-Run a simple model with constraints
 
-Test to see if I specified this correctly
-ran without the fixed = fixed statements to see if the code will run
 
-took 17 minutes to run
+Run a model with constraints
+
+
 
 ```{r}
 tic()
-Sas = list(formula=~age + sex)
-g.dot = list(formula=~1)
+S.ass = list(formula=~age + sex + site)
+g.site = list(formula=~site)
 p.fix = list(formula=~1, fixed=fixed.p)
 c.fix = list(formula=~1, fixed=fixed.c)
-# p.fix = list(formula=~1)
-# c.fix = list(formula=~1)
 f0.site = list(formula=~site)
-mrd1 <- mark(mgs.rd.pd, mgs.rd.ddl, model.parameters = list(S = Sas, GammaDoublePrime = g.dot, GammaPrime = g.dot, p=p.fix, c=c.fix, f0=f0.site))
+mrd1 <- mark(mgs.rd.pd, mgs.rd.ddl, model.parameters = list(S = Sass, GammaDoublePrime = g.dot, GammaPrime = g.dot, p=p.fix, c=c.fix, f0=f0.site))
 
 
 cat("
@@ -619,6 +625,12 @@ toc()
 tic()
 
 mrd1$results$real
+
+
+
+write.csv(mrd1$results$real, file = "Real_fixed_pc.csv")
+write.csv(mrd1$results$beta, file = "Beta_fixed_pc.csv")
+
 
 
 cat("
