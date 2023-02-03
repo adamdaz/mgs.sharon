@@ -492,11 +492,12 @@ cleanup(ask = FALSE)
 
 
 
-
+___________________________________________________
 
 Include data to constrain p and c by site and date
 
-
+Here to next section defined by red lines is a complete analysis
+_______________________________________________________
 ```{r}
 tic()
 #input data for each site
@@ -611,7 +612,7 @@ g.site = list(formula=~site)
 p.fix = list(formula=~1, fixed=fixed.p)
 c.fix = list(formula=~1, fixed=fixed.c)
 f0.site = list(formula=~site)
-mrd1 <- mark(mgs.rd.pd, mgs.rd.ddl, model.parameters = list(S = Sass, GammaDoublePrime = g.dot, GammaPrime = g.dot, p=p.fix, c=c.fix, f0=f0.site))
+mrd1 <- mark(mgs.rd.pd, mgs.rd.ddl, model.parameters = list(S = S.ass, GammaDoublePrime = g.dot, GammaPrime = g.dot, p=p.fix, c=c.fix, f0=f0.site))
 
 
 cat("
@@ -638,6 +639,227 @@ Ran at: ");Sys.time()
 toc()
 ```
 
+______________________________________________________________
+
+Modify code to add time-specific and site-specific covariates
+________________________________________________________________
+
+
+Clean up the folder - remove unneeded mark files. 
+
+```{r}
+tic()
+
+cleanup(ask = FALSE)
+
+cat("
+Ran at: ");Sys.time()
+e = toc()
+cat((e$toc-e$tic)/60, "min")
+```
+
+
+
+
+
+First - copy code from last successful run to add to it. 
+
+Same as lines 501-565
+
+```{r}
+tic()
+#input data for each site
+mgs.rd.data.site1a <- read.table(file = "mgs.rd.site1.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site2a <- read.table(file = "mgs.rd.site2.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site3a <- read.table(file = "mgs.rd.site3.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site4a <- read.table(file = "mgs.rd.site4.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+
+mgs.rd.alla <- rbind(mgs.rd.data.site1a, mgs.rd.data.site2a, mgs.rd.data.site3a, mgs.rd.data.site4a)
+
+mgs.rd.allb <- subset(mgs.rd.alla, mgs.rd.alla$id != "Dummy" )
+mgs.rd.allc <- subset(mgs.rd.allb, mgs.rd.allb$captage != "" )
+
+#replace strata with 1s
+mgs.rd.allc$ch <- gsub("2","1", mgs.rd.allc$ch)
+mgs.rd.allc$ch <- gsub("3","1", mgs.rd.allc$ch)
+mgs.rd.allc$ch <- gsub("4","1", mgs.rd.allc$ch)
+
+mgs.rd.allc$captage <- as.factor(ifelse(mgs.rd.allc$captage=="ADU",1,0))
+
+mgs.rd.all <- mgs.rd.allc
+
+#cleanup 
+
+rm(mgs.rd.alla, mgs.rd.allb, mgs.rd.allc, mgs.rd.data.site1a ,mgs.rd.data.site2a, mgs.rd.data.site3a, mgs.rd.data.site4a)
+
+# input the data for each site to include the constrained values for p and c by date since start
+# days since start are only for the primary occassions (sessions) 
+fixed.pc <- read.csv("fixed.pc.csv", header = TRUE, fill = TRUE)
+site1.fixed.p <- fixed.pc[,"site1.fixed.p"]
+site2.fixed.p <- fixed.pc[,"site2.fixed.p"]
+site3.fixed.p <- fixed.pc[,"site3.fixed.p"]
+site4.fixed.p <- fixed.pc[,"site4.fixed.p"]
+
+# set fixed p for 16 groups where site is last - 
+# 710 lines * 4 = 2840 for site 1, next 2840 site 2, etc.
+fixed.p <- c(rep(site1.fixed.p, 4), rep(site2.fixed.p,4), rep(site3.fixed.p, 4), rep(site4.fixed.p,4))
+
+#set fixed for c similarly except do not include the "s"
+a <- fixed.pc[,"site1.fixed.c"]
+site1.fixed.c <- as.numeric(subset(a, a!="s"))
+
+a <- fixed.pc[,"site2.fixed.c"]
+site2.fixed.c <- as.numeric(subset(a, a!="s"))
+
+a <- fixed.pc[,"site3.fixed.c"]
+site3.fixed.c <- as.numeric(subset(a, a!="s"))
+
+a <- fixed.pc[,"site4.fixed.c"]
+site4.fixed.c <- as.numeric(subset(a, a!="s"))
+
+fixed.c <- c(rep(site1.fixed.c,4), rep(site2.fixed.c,4), rep(site3.fixed.c,4), rep(site4.fixed.c,4))
+
+# set time intervals 
+a <- fixed.pc[,"Time.intervals..years."]
+rd.yr <- as.numeric(a[1:709])
+
+#cleanup 
+rm(a, site1.fixed.c, site1.fixed.p, site2.fixed.c, site2.fixed.p, site3.fixed.c, site3.fixed.p, site4.fixed.c, site4.fixed.p)
+
+
+cat("
+Ran at: ");Sys.time()
+e = toc() 
+cat((e$toc-e$tic)/60, "min")
+```
+Add site-specific covariates as individual covariates
+elevation
+```{r}
+tic()
+
+mgs.rd.all$elevation <- as.numeric(
+  ifelse(mgs.rd.all$site == 1, 1024, 
+         ifelse(mgs.rd.all$site == 2, 1094, 
+                ifelse(mgs.rd.all$site == 3, 1475,
+                       ifelse(mgs.rd.all$site ==4, 1513, 0))))
+)
+
+
+
+cat("
+Ran at: ");Sys.time()
+e = toc() 
+cat((e$toc-e$tic)/60, "min")
+```
+
+set up analysis using elevation as covariate for survival
+
+
+```{r}
+tic()
+
+
+mgs.rd.pd <- process.data(data = mgs.rd.all, model = "Robust", groups = c("sex","captage", "site"), time.intervals = rd.yr, age.var = 2, initial.ages = c(1,0), age.unit = 1)
+
+mgs.rd.ddl <- make.design.data(mgs.rd.pd)
+
+
+mgs.rd.ddl$S$age = factor(ifelse(mgs.rd.ddl$S$Age<1,0,1 ))
+
+
+
+cat("
+Ran at: ");Sys.time()
+e = toc() 
+cat((e$toc-e$tic)/60, "min")
+```
+
+
+
+Run the model 
+says 16 minutes but that is not true
+
+```{r}
+tic()
+
+S.ae = list(formula=~age + elevation)
+g.site = list(formula=~site)
+p.fix = list(formula=~1, fixed=fixed.p)
+c.fix = list(formula=~1, fixed=fixed.c)
+f0.site = list(formula=~site)
+mrd1 <- mark(mgs.rd.pd, mgs.rd.ddl, model.parameters = list(S = S.ae, GammaDoublePrime = g.site, GammaPrime = g.site, p=p.fix, c=c.fix, f0=f0.site))
+
+
+
+
+cat("
+Ran at: ");Sys.time()
+e = toc()
+cat((e$toc-e$tic)/60, "min")
+```
+
+
+Show results
+
+```{r}
+start <- Sys.time()
+tic()
+
+real <- mrd1$results$real
+real
+
+write.csv(real, "real.csv")
+
+
+cat("
+Ran at: ");Sys.time()
+e = toc()
+cat((e$toc-e$tic)/60, "min
+")
+
+end <- Sys.time()
+cat("Elapsed time: "); end-start
+
+```
+
+
+
+```{r}
+start <- Sys.time()
+tic()
+
+cat("
+Ran at: ");Sys.time()
+e = toc()
+cat((e$toc-e$tic)/60, "min
+")
+
+end <- Sys.time()
+cat("Elapsed time: "); end-start
+
+```
+
+
+
+```{r}
+start <- Sys.time()
+tic()
+
+cat("
+Ran at: ");Sys.time()
+e = toc()
+cat((e$toc-e$tic)/60, "min
+")
+
+end <- Sys.time()
+cat("Elapsed time: "); end-start
+
+```
+
+
+
+
+
 
 
 
@@ -645,11 +867,18 @@ Copy and paste r chunk to include timing information
 
 
 ```{r}
+start <- Sys.time()
 tic()
 
 cat("
 Ran at: ");Sys.time()
-toc()
+e = toc()
+cat((e$toc-e$tic)/60, "min
+")
+
+end <- Sys.time()
+cat("Elapsed time: "); end-start
+
 ```
 
 
