@@ -752,6 +752,11 @@ e = toc()
 cat((e$toc-e$tic)/60, "min")
 ```
 
+
+
+
+
+
 set up analysis using elevation as covariate for survival
 
 
@@ -759,7 +764,7 @@ set up analysis using elevation as covariate for survival
 tic()
 
 
-mgs.rd.pd <- process.data(data = mgs.rd.all, model = "Robust", groups = c("sex","captage", "site"), time.intervals = rd.yr, age.var = 2, initial.ages = c(1,0), age.unit = 1)
+mgs.rd.pd <- process.data(data = mgs.rd.all, model = "Robust", groups = c("sex","captage", "site"), time.intervals = rd.yr, age.var = 2, initial.ages = c(1,0), age.unit = 1, begin.time=0)
 
 mgs.rd.ddl <- make.design.data(mgs.rd.pd)
 
@@ -773,6 +778,31 @@ Ran at: ");Sys.time()
 e = toc() 
 cat((e$toc-e$tic)/60, "min")
 ```
+Add rain as a time-specific covariate
+This is done by modifying the ddl file
+
+
+```{r}
+tic()
+
+rain <- as.data.frame(read.csv("rain.csv"))
+rain.time <- rain[1:328,]
+
+rain.time$time <- levels(mgs.rd.ddl$S$time)
+
+write.csv(test.time, "test.time.csv")
+write.csv(rain.test.time, "test.rain.csv")
+
+mgs.rd.ddl$S=merge_design.covariates(mgs.rd.ddl$S, rain.time, bytime = TRUE)
+
+
+
+cat("
+Ran at: ");Sys.time()
+e = toc() 
+cat((e$toc-e$tic)/60, "min")
+```
+
 
 
 
@@ -780,9 +810,11 @@ Run the model
 says 16 minutes but that is not true
 
 ```{r}
+cat("started at "); start <- Sys.time(); start
+
 tic()
 
-S.ae = list(formula=~age + elevation)
+S.asr = list(formula=~age +sex + rain)
 g.site = list(formula=~site)
 p.fix = list(formula=~1, fixed=fixed.p)
 c.fix = list(formula=~1, fixed=fixed.c)
@@ -793,9 +825,11 @@ mrd1 <- mark(mgs.rd.pd, mgs.rd.ddl, model.parameters = list(S = S.ae, GammaDoubl
 
 
 cat("
-Ran at: ");Sys.time()
+Ran at: ");end <- Sys.time(); end
 e = toc()
 cat((e$toc-e$tic)/60, "min")
+end-start
+
 ```
 
 
@@ -807,26 +841,12 @@ tic()
 
 real <- mrd1$results$real
 real
+beta <- mrd1$results$beta
+beta
+
 
 write.csv(real, "real.csv")
-
-
-cat("
-Ran at: ");Sys.time()
-e = toc()
-cat((e$toc-e$tic)/60, "min
-")
-
-end <- Sys.time()
-cat("Elapsed time: "); end-start
-
-```
-
-
-
-```{r}
-start <- Sys.time()
-tic()
+write.csv(beta, "beta.csv")
 
 cat("
 Ran at: ");Sys.time()
@@ -841,18 +861,419 @@ cat("Elapsed time: "); end-start
 
 
 
+
+
+______________________________________________________________
+
+Modify code to add NDVI covariates
+both time- and site-specific
+modify elevation to be site-specific instead of as individual covariate
+________________________________________________________________
+
+
+Clean up the folder - remove unneeded mark files. 
+
 ```{r}
-start <- Sys.time()
 tic()
+
+cleanup(ask = FALSE)
 
 cat("
 Ran at: ");Sys.time()
 e = toc()
-cat((e$toc-e$tic)/60, "min
-")
+cat((e$toc-e$tic)/60, "min")
+```
 
-end <- Sys.time()
-cat("Elapsed time: "); end-start
+
+
+
+
+Download the data to set up analysis
+copy code from last successful run to add to it. 
+
+Same as lines 501-565
+
+```{r}
+tic()
+#input data for each site
+mgs.rd.data.site1a <- read.table(file = "mgs.rd.site1.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site2a <- read.table(file = "mgs.rd.site2.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site3a <- read.table(file = "mgs.rd.site3.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+mgs.rd.data.site4a <- read.table(file = "mgs.rd.site4.txt", header = TRUE, colClasses = c("character", "factor", "factor", "factor", "factor"), col.names = c("ch", "captage1", "sex", "id", "site") )
+
+mgs.rd.alla <- rbind(mgs.rd.data.site1a, mgs.rd.data.site2a, mgs.rd.data.site3a, mgs.rd.data.site4a)
+
+mgs.rd.allb <- subset(mgs.rd.alla, mgs.rd.alla$id != "Dummy" )
+mgs.rd.allc <- subset(mgs.rd.allb, mgs.rd.allb$captage != "" )
+
+#replace strata with 1s
+mgs.rd.allc$ch <- gsub("2","1", mgs.rd.allc$ch)
+mgs.rd.allc$ch <- gsub("3","1", mgs.rd.allc$ch)
+mgs.rd.allc$ch <- gsub("4","1", mgs.rd.allc$ch)
+
+mgs.rd.allc$captage <- as.factor(ifelse(mgs.rd.allc$captage=="ADU",1,0))
+
+mgs.rd.all <- mgs.rd.allc
+
+#cleanup 
+
+rm(mgs.rd.alla, mgs.rd.allb, mgs.rd.allc, mgs.rd.data.site1a ,mgs.rd.data.site2a, mgs.rd.data.site3a, mgs.rd.data.site4a)
+
+# input the data for each site to include the constrained values for p and c by date since start
+# days since start are only for the primary occassions (sessions) 
+fixed.pc <- read.csv("fixed.pc.csv", header = TRUE, fill = TRUE)
+site1.fixed.p <- fixed.pc[,"site1.fixed.p"]
+site2.fixed.p <- fixed.pc[,"site2.fixed.p"]
+site3.fixed.p <- fixed.pc[,"site3.fixed.p"]
+site4.fixed.p <- fixed.pc[,"site4.fixed.p"]
+
+# set fixed p for 16 groups where site is last - 
+# 710 lines * 4 = 2840 for site 1, next 2840 site 2, etc.
+fixed.p <- c(rep(site1.fixed.p, 4), rep(site2.fixed.p,4), rep(site3.fixed.p, 4), rep(site4.fixed.p,4))
+
+#set fixed for c similarly except do not include the "s"
+a <- fixed.pc[,"site1.fixed.c"]
+site1.fixed.c <- as.numeric(subset(a, a!="s"))
+
+a <- fixed.pc[,"site2.fixed.c"]
+site2.fixed.c <- as.numeric(subset(a, a!="s"))
+
+a <- fixed.pc[,"site3.fixed.c"]
+site3.fixed.c <- as.numeric(subset(a, a!="s"))
+
+a <- fixed.pc[,"site4.fixed.c"]
+site4.fixed.c <- as.numeric(subset(a, a!="s"))
+
+fixed.c <- c(rep(site1.fixed.c,4), rep(site2.fixed.c,4), rep(site3.fixed.c,4), rep(site4.fixed.c,4))
+
+# set time intervals 
+a <- fixed.pc[,"Time.intervals..years."]
+rd.yr <- as.numeric(a[1:709])
+
+#cleanup 
+rm(a, site1.fixed.c, site1.fixed.p, site2.fixed.c, site2.fixed.p, site3.fixed.c, site3.fixed.p, site4.fixed.c, site4.fixed.p)
+
+
+cat("
+Ran at: ");Sys.time()
+e = toc() 
+cat((e$toc-e$tic)/60, "min")
+```
+
+
+
+set up analysis 
+process the data
+
+
+```{r}
+start<- Sys.time();tic()
+
+
+mgs.rd.pd <- process.data(data = mgs.rd.all, model = "Robust", groups = c("sex","captage", "site"), time.intervals = rd.yr, age.var = 2, initial.ages = c(1,0), age.unit = 1, begin.time=0)
+
+
+
+cat("
+Ran at: ");Sys.time()
+e = toc(); cat((e$toc-e$tic)/60, "min")
+end <- Sys.time(); cat("Elapsed time: "); end-start
+```
+
+
+Create the design data list ddl
+Modify ddl to include Age as a 2-level factor
+
+
+```{r}
+start <- Sys.time(); tic()
+
+
+mgs.rd.ddl <- make.design.data(mgs.rd.pd)
+
+
+mgs.rd.ddl$S$age = factor(ifelse(mgs.rd.ddl$S$Age<1,0,1 ))
+
+
+
+cat("
+Ran at: ");Sys.time(); e = toc(); cat((e$toc-e$tic)/60, "min
+")
+end <- Sys.time(); cat("Elapsed time: "); end-start
+
+```
+
+
+
+
+
+
+
+Add rain as a time-specific covariate for all demographic parameters (not p or c)
+This is done by modifying the ddl file
+
+
+```{r}
+tic()
+
+#save copy of ddl in case I need to redo some of the code below 
+mgs.rd.ddl2 <- mgs.rd.ddl
+
+
+Rain <- as.data.frame(read.csv("rain.csv"))
+Rain.time <- Rain[1:328,]
+
+Rain.time$time <- levels(mgs.rd.ddl$S$time)
+
+mgs.rd.ddl$S=merge_design.covariates(mgs.rd.ddl$S, Rain.time, bytime = TRUE)
+mgs.rd.ddl$GammaDoublePrime=merge_design.covariates(mgs.rd.ddl$GammaDoublePrime, Rain.time, bytime = TRUE)
+mgs.rd.ddl$GammaPrime=merge_design.covariates(mgs.rd.ddl$GammaPrime, Rain.time, bytime = TRUE)
+mgs.rd.ddl$f0=merge_design.covariates(mgs.rd.ddl$f0, Rain.time, bytime = TRUE)
+
+
+cat("
+Ran at: ");Sys.time()
+e = toc() 
+cat((e$toc-e$tic)/60, "min")
+```
+
+Now add the NDVI data by modifying the ddl 
+unlike rainfall, NDVI differs by site so need to modify the code for that
+
+
+```{r}
+start <- Sys.time(); tic()
+# 
+# #combine the time and site values from PIMS for S, gamma'', gamma' and f0
+# Stime <- mgs.rd.ddl$S$time
+# Ssite <- mgs.rd.ddl$S$site
+# Stimesite <- cbind(Stime, Ssite)
+# write.csv(Stimesite, "Stimesite.csv")
+# 
+# GammaDoublePrimetime <- mgs.rd.ddl$GammaDoublePrime$time
+# GammaDoublePrimesite <- mgs.rd.ddl$GammaDoublePrime$site
+# GammaDoublePrimetimesite <- cbind(GammaDoublePrimetime, GammaDoublePrimesite)
+# write.csv(GammaDoublePrimetimesite, "GammaDoublePrimetimesite.csv")
+# 
+# GammaPrimetime <- mgs.rd.ddl$GammaPrime$time
+# GammaPrimesite <- mgs.rd.ddl$GammaPrime$site
+# GammaPrimetimesite <- cbind(GammaPrimetime, GammaPrimesite)
+# write.csv(GammaPrimetimesite, "GammaPrimetimesite.csv")
+# 
+# f0time <- mgs.rd.ddl$f0$time
+# f0site <- mgs.rd.ddl$f0$site
+# f0timesite <- cbind(f0time, f0site)
+# write.csv(f0timesite, "f0timesite.csv")
+# 
+# #how many rows for each dataset?
+# cat("Stimesite");length(Stimesite)
+# cat("GammaDoublePrime");length(GammaDoublePrimetimesite)
+# cat("GammaPrime");length(GammaPrimetimesite)
+# cat("f0");length(f0timesite)
+
+cat("Ran at: ");Sys.time(); e = toc(); cat((e$toc-e$tic)/60, "min
+")
+end <- Sys.time(); cat("Elapsed time: "); end-start
+
+```
+
+Import the file after adding the time and site specific covariates for each parameter
+
+```{r}
+start <- Sys.time(); tic()
+#read in annotated data set
+Stimesitevars <- read.csv("Stimesitevars.csv")
+
+#set variables for Survival rates
+
+mgs.rd.ddl$S$Nda <- Stimesitevars$Nda
+mgs.rd.ddl$S$Nds <- Stimesitevars$Nds
+mgs.rd.ddl$S$Ndl <- Stimesitevars$Ndl
+mgs.rd.ddl$S$Ndh <- Stimesitevars$Ndh
+mgs.rd.ddl$S$Ea <- Stimesitevars$Ea
+mgs.rd.ddl$S$Es <- Stimesitevars$Es
+mgs.rd.ddl$S$El <- Stimesitevars$El
+mgs.rd.ddl$S$Eh <- Stimesitevars$Eh
+mgs.rd.ddl$S$Tia <- Stimesitevars$Tia
+mgs.rd.ddl$S$Tis <- Stimesitevars$Tis
+mgs.rd.ddl$S$Til <- Stimesitevars$Til
+mgs.rd.ddl$S$Tih <- Stimesitevars$Tih
+
+# Save data from ddl to preserve annotation effort out of R
+# 
+# S <- as.data.frame(mgs.rd.ddl$S$time)
+# S$site <- mgs.rd.ddl$S$site
+# S$nda<- mgs.rd.ddl$S$nda
+# S$nds<- mgs.rd.ddl$S$nds
+# S$ndl <- mgs.rd.ddl$S$ndl
+# S$ndh<- mgs.rd.ddl$S$ndh
+# S$ea<- mgs.rd.ddl$S$ea 
+# S$es<- mgs.rd.ddl$S$es 
+# S$el<- mgs.rd.ddl$S$el
+# S$eh<- mgs.rd.ddl$S$eh 
+# S$tia<- mgs.rd.ddl$S$tia
+# S$tis<- mgs.rd.ddl$S$tis 
+# S$til<- mgs.rd.ddl$S$til 
+# S$tih<- mgs.rd.ddl$S$tih 
+
+#set GammaDoublePrime equal to S variables
+
+mgs.rd.ddl$GammaDoublePrime$Nda <- Stimesitevars$Nda
+mgs.rd.ddl$GammaDoublePrime$Nds <- Stimesitevars$Nds
+mgs.rd.ddl$GammaDoublePrime$Ndl <- Stimesitevars$Ndl
+mgs.rd.ddl$GammaDoublePrime$Ndh <- Stimesitevars$Ndh
+mgs.rd.ddl$GammaDoublePrime$Ea <- Stimesitevars$Ea
+mgs.rd.ddl$GammaDoublePrime$Es <- Stimesitevars$Es
+mgs.rd.ddl$GammaDoublePrime$El <- Stimesitevars$El
+mgs.rd.ddl$GammaDoublePrime$Eh <- Stimesitevars$Eh
+mgs.rd.ddl$GammaDoublePrime$Tia <- Stimesitevars$Tia
+mgs.rd.ddl$GammaDoublePrime$Tis <- Stimesitevars$Tis
+mgs.rd.ddl$GammaDoublePrime$Til <- Stimesitevars$Til
+mgs.rd.ddl$GammaDoublePrime$Tih <- Stimesitevars$Tih
+
+
+
+
+cat("
+Ran at: ");Sys.time(); e = toc(); cat((e$toc-e$tic)/60, "min
+")
+end <- Sys.time(); cat("Elapsed time: "); end-start
+
+```
+
+Figure out the covariates for each PIM for other parameters
+Start by exporting the parameter indices, time and site values from the ddl
+
+```{r}
+start <- Sys.time(); tic()
+# 
+# Ssitetime <- as.data.frame(cbind(mgs.rd.ddl$S$par.index, mgs.rd.ddl$S$time, mgs.rd.ddl$S$site))
+# 
+# GammaPrimesitetime <- as.data.frame(cbind(mgs.rd.ddl$GammaPrime$par.index, mgs.rd.ddl$GammaPrime$time, mgs.rd.ddl$GammaPrime$site))
+# 
+# f0sitetime <- as.data.frame(cbind(mgs.rd.ddl$f0$par.index, mgs.rd.ddl$f0$time, mgs.rd.ddl$f0$site))
+# 
+# psitetime <- as.data.frame(cbind(mgs.rd.ddl$p$par.index, mgs.rd.ddl$p$time, mgs.rd.ddl$p$site))
+# 
+# csitetime <- as.data.frame(cbind(mgs.rd.ddl$c$par.index, mgs.rd.ddl$c$time, mgs.rd.ddl$c$site))
+# 
+# write.csv(Ssitetime, "Ssitetime.csv")
+# write.csv(GammaPrimesitetime, "GammaPrimesitetime.csv")
+# write.csv(f0sitetime, "f0sitetime.csv")
+# write.csv(psitetime, "psitetime.csv")
+# write.csv(csitetime, "csitetime.csv")
+
+
+cat("
+Ran at: ");Sys.time(); e = toc(); cat((e$toc-e$tic)/60, "min
+")
+end <- Sys.time(); cat("Elapsed time: "); end-start
+
+```
+
+Annotate the sitetime files with the appropriate covariates in Excel 
+import them back to R
+
+
+```{r}
+start <- Sys.time(); tic()
+
+GammaPrimevars <- read.csv("GammaPrimesitetimevars.csv")
+f0vars <- read.csv("f0sitetimevars.csv")
+
+mgs.rd.ddl$GammaPrime$Nda <- GammaPrimevars$Nda
+mgs.rd.ddl$GammaPrime$Nds <- GammaPrimevars$Nds
+mgs.rd.ddl$GammaPrime$Ndl <- GammaPrimevars$Ndl
+mgs.rd.ddl$GammaPrime$Ndh <- GammaPrimevars$Ndh
+mgs.rd.ddl$GammaPrime$Ea <- GammaPrimevars$Ea
+mgs.rd.ddl$GammaPrime$Es <- GammaPrimevars$Es
+mgs.rd.ddl$GammaPrime$El <- GammaPrimevars$El
+mgs.rd.ddl$GammaPrime$Eh <- GammaPrimevars$Eh
+mgs.rd.ddl$GammaPrime$Tia <- GammaPrimevars$Tia
+mgs.rd.ddl$GammaPrime$Tis <- GammaPrimevars$Tis
+mgs.rd.ddl$GammaPrime$Til <- GammaPrimevars$Til
+mgs.rd.ddl$GammaPrime$Tih <- GammaPrimevars$Tih
+
+
+mgs.rd.ddl$f0$Nda <- f0vars$Nda
+mgs.rd.ddl$f0$Nds <- f0vars$Nds
+mgs.rd.ddl$f0$Ndl <- f0vars$Ndl
+mgs.rd.ddl$f0$Ndh <- f0vars$Ndh
+mgs.rd.ddl$f0$Ea <- f0vars$Ea
+mgs.rd.ddl$f0$Es <- f0vars$Es
+mgs.rd.ddl$f0$El <- f0vars$El
+mgs.rd.ddl$f0$Eh <- f0vars$Eh
+mgs.rd.ddl$f0$Tia <- f0vars$Tia
+mgs.rd.ddl$f0$Tis <- f0vars$Tis
+mgs.rd.ddl$f0$Til <- f0vars$Til
+mgs.rd.ddl$f0$Tih <- f0vars$Tih
+
+
+
+cat("
+Ran at: ");Sys.time(); e = toc(); cat((e$toc-e$tic)/60, "min
+")
+end <- Sys.time(); cat("Elapsed time: "); end-start
+
+```
+
+Run model with most of the parameters of interest
+
+
+```{r}
+start <- Sys.time(); tic()
+
+#removed Nda (average NDVI from model due to NA values)
+S.most = list(formula=~age +sex + site + Ea + Rain + Tia)
+g.most = list(formula=~age +sex + site + Ea + Rain + Tia)
+p.ts = list(formula=~time + site, fixed=fixed.p)
+c.ts = list(formula=~time + site, fixed=fixed.c)
+f0.most = list(formula=~age +sex + site + Ea + Rain + Tia)
+
+param.dot = list(formula=~1)
+
+
+mrd1 <- mark(mgs.rd.pd, mgs.rd.ddl, model.parameters = list(S = S.most, GammaDoublePrime = param.dot, GammaPrime = param.dot, p=param.dot, c=param.dot, f0=param.dot))
+
+
+
+cat("
+Ran at: ");Sys.time(); e = toc(); cat((e$toc-e$tic)/60, "min
+")
+end <- Sys.time(); cat("Elapsed time: "); end-start
+
+```
+
+Look at results
+
+
+
+```{r}
+start <- Sys.time(); tic()
+
+
+
+
+cat("
+Ran at: ");Sys.time(); e = toc(); cat((e$toc-e$tic)/60, "min
+")
+end <- Sys.time(); cat("Elapsed time: "); end-start
+
+```
+
+
+
+
+```{r}
+start <- Sys.time(); tic()
+
+
+
+
+cat("
+Ran at: ");Sys.time(); e = toc(); cat((e$toc-e$tic)/60, "min
+")
+end <- Sys.time(); cat("Elapsed time: "); end-start
 
 ```
 
@@ -867,19 +1288,18 @@ Copy and paste r chunk to include timing information
 
 
 ```{r}
-start <- Sys.time()
-tic()
+start <- Sys.time(); tic()
+
+
+
 
 cat("
-Ran at: ");Sys.time()
-e = toc()
-cat((e$toc-e$tic)/60, "min
+Ran at: ");Sys.time(); e = toc(); cat((e$toc-e$tic)/60, "min
 ")
-
-end <- Sys.time()
-cat("Elapsed time: "); end-start
+end <- Sys.time(); cat("Elapsed time: "); end-start
 
 ```
+
 
 
 
@@ -895,12 +1315,12 @@ Export data to process directly in MARK
 
 
 ```{r}
-tic()
-
-m2=mark(mgs.pd, mgs.ddl, model.parameters = list(Phi=p., p = p.), output = FALSE)
-
-export.MARK(mgs.pd, "mgs.cjsdata", m2, replace = TRUE )
-
+# tic()
+# 
+# m2=mark(mgs.pd, mgs.ddl, model.parameters = list(Phi=p., p = p.), output = FALSE)
+# 
+# export.MARK(mgs.pd, "mgs.cjsdata", m2, replace = TRUE )
+# 
 
 cat("
 Ran at: ");Sys.time()
